@@ -1,0 +1,213 @@
+
+<!DOCTYPE html>
+<html lang="de">
+	<head>
+		<meta charset="utf-8">
+		<title>Snake</title>
+		<style>
+			table {
+				border-collapse: collapse;
+				display: inline-table;
+			}
+			table, p {
+				margin-right: 10px;
+				margin-left: 10px;
+			}
+			p {
+				margin-top: 10px;
+			}
+			td {
+				border: 1px solid black;
+				width: 10px;
+				height: 10px;
+			}
+			div {
+				margin: auto;
+				width: max-content;
+			}
+			span {
+				display: inline-block;
+				width: 135px;
+			}
+		</style>
+	</head>	
+	<body id="body">
+		<script>
+			class World {
+				div;
+				bunny;
+				constructor(xStart, xEnd, yStart, yEnd, tickRate) {
+					this.xStart = xStart;
+					this.xEnd = xEnd;
+					this.yStart = yStart;
+					this.yEnd = yEnd;
+					this.width = this.xEnd + 1 - this.xStart;
+					this.height = this.yEnd + 1 - this.yStart;
+					this.tickRate = tickRate;
+					this.createTable();
+					this.timeStart = new Date().getTime() / 1000;
+				}
+
+				createTable() {
+					this.div = document.getElementById('div');
+					let table = document.createElement('table');
+					let tbody = document.createElement('tbody');
+					for (let i = this.yStart; i <= this.yEnd; i++) {
+						let tr = document.createElement('tr');
+						tr.className = 'y-' + i;
+						for (let j = this.xStart; j <= this.xEnd; j++) {
+							let td = document.createElement('td');
+							td.className = 'x-' + j;
+							tr.appendChild(td);
+						}
+						tbody.appendChild(tr);
+					}
+					table.appendChild(tbody);
+					this.div.appendChild(table);
+				}
+
+				collidesWithWorldEnd(snake) {
+					const snakeHead = snake.head;
+					const direction = snake.direction;
+					return (
+							snakeHead.x + direction.x < this.xStart ||
+							snakeHead.x + direction.x > this.xEnd ||
+							snakeHead.y + direction.y < this.yStart ||
+							snakeHead.y + direction.y > this.yEnd
+					);
+				}
+
+				updateGame(gameTickId, snake) {
+					if (this.collidesWithWorldEnd(snake) || snake.doesHeadCollideWithBody()) {
+						clearInterval(gameTickId);
+						return;
+					}
+					snake.move();
+				}
+
+				spawnBunny(snake) {
+					let x;
+					let y;
+					do {
+						if (snake.body.length + 1 >= this.width * this.height) {
+							return;
+						}
+						x = Math.round(Math.random() * this.xEnd);
+						y = Math.round(Math.random() * this.yEnd);
+					} while (
+						snake.head.x === x && snake.head.y === y ||
+						snake.body.find(bodyPart => bodyPart.x === x && bodyPart.y === y)
+					)
+					this.bunny = new Block(x, y, 'grey');
+				}
+			}
+			class Snake {
+				constructor(head, body, direction) {
+					this.head = head;
+					this.body = body;
+					this.direction = direction;
+					document.addEventListener('keydown', (keyboardEvent) => {
+						this.changeDirection(keyboardEvent.code);
+					});
+					this.bunnyScore = 0;
+					this.scoreSpan = document.createElement('span');
+					this.scoreSpan.textContent = 'Bunnies eaten: ' + this.bunnyScore;
+					world.div.appendChild(this.scoreSpan);
+				}
+
+				move() {
+					this.head.decolorizeBlock();
+					this.head.move(this.direction.x, this.direction.y)
+					this.head.setActiveDomElement();
+					this.head.paintBlock();
+					this.body.splice(0, 0, new Block(this.head.x - this.direction.x, this.head.y - this.direction.y, 'green'));
+					if (this.head.x !== world.bunny.x || this.head.y !== world.bunny.y) {
+						this.body.pop().decolorizeBlock();
+					} else {
+						this.bunnyScore++;
+						this.scoreSpan.textContent = 'Bunnies eaten: ' + this.bunnyScore;
+						world.spawnBunny(this);
+					}
+				}
+
+				changeDirection(keyboardEventCode) {
+					if (keyboardEventCode ==='KeyW' && (this.head.y + DIRECTION.UP.y) !== this.body.at(0).y) {
+						this.direction = DIRECTION.UP;
+					} else if (keyboardEventCode ==='KeyD' && (this.head.x + DIRECTION.RIGHT.x) !== this.body.at(0).x) {
+						this.direction = DIRECTION.RIGHT;
+					} else if (keyboardEventCode ==='KeyS' && (this.head.y + DIRECTION.DOWN.y) !== this.body.at(0).y) {
+						this.direction = DIRECTION.DOWN;
+					} else if (keyboardEventCode ==='KeyA' && (this.head.x + DIRECTION.LEFT.x) !== this.body.at(0).x) {
+						this.direction = DIRECTION.LEFT;
+					}
+				}
+
+				doesHeadCollideWithBody() {
+					let doesCollide = false;
+					this.body.forEach((bodyPart) => {
+						if (this.head.x + this.direction.x === bodyPart.x && this.head.y + this.direction.y === bodyPart.y) {
+							doesCollide = true;
+						}
+					});
+					return doesCollide;
+				}
+			}
+			class Block {
+				activeDomElement;
+				constructor(x, y, color) {
+					this.x = x;
+					this.y = y;
+					this.color = color;
+					this.setActiveDomElement();
+					this.paintBlock();
+				}
+
+				setActiveDomElement() {
+					let tr = document.querySelector('tr.y-' + this.y);
+					this.activeDomElement = tr.querySelector('td.x-' + this.x);
+				}
+
+				move(x, y) {
+					this.x += x;
+					this.y += y;
+				}
+
+				decolorizeBlock() {
+					this.activeDomElement.style.backgroundColor = 'white';
+				}
+
+				paintBlock() {
+					this.activeDomElement.style.backgroundColor = this.color;
+				}
+			}
+			const DIRECTION = {
+				UP: {
+					x: 0,
+					y: -1
+				},
+				RIGHT: {
+					x: 1,
+					y: 0
+				},
+				DOWN: {
+					x: 0,
+					y: 1
+				},
+				LEFT: {
+					x: -1,
+					y: 0
+				}
+			};
+			Object.freeze(DIRECTION);
+		</script>
+		<div id="div">
+			<script>
+				const world = new World(0, 24, 0, 24, 100);
+			let snake = new Snake(new Block(4, 2, 'green'), [new Block(3, 2, 'green'), new Block(2, 2, 'green')], DIRECTION.RIGHT);
+			world.spawnBunny(snake);
+			let gameTickId = setInterval(() => {world.updateGame(gameTickId, snake);}, world.tickRate);
+			</script>
+			<p>You can control the snake with the 'wasd' keys!</p>
+		</div>
+	</body>
+</html>

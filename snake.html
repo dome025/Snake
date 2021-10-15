@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 	<head>
@@ -120,7 +119,7 @@
 					this.head.move(this.direction.x, this.direction.y)
 					this.head.setActiveDomElement();
 					this.head.paintBlock();
-					this.body.splice(0, 0, new Block(this.head.x - this.direction.x, this.head.y - this.direction.y, 'green'));
+					this.body.unshift(new Block(this.head.x - this.direction.x, this.head.y - this.direction.y, 'green'));
 					if (this.head.x !== world.bunny.x || this.head.y !== world.bunny.y) {
 						this.body.pop().decolorizeBlock();
 					} else {
@@ -131,13 +130,13 @@
 				}
 
 				changeDirection(keyboardEventCode) {
-					if (keyboardEventCode ==='KeyW' && (this.head.y + DIRECTION.UP.y) !== this.body.at(0).y) {
+					if (keyboardEventCode ==='KeyW' && (this.head.y + DIRECTION.UP.y) !== this.body[0].y) {
 						this.direction = DIRECTION.UP;
-					} else if (keyboardEventCode ==='KeyD' && (this.head.x + DIRECTION.RIGHT.x) !== this.body.at(0).x) {
+					} else if (keyboardEventCode ==='KeyD' && (this.head.x + DIRECTION.RIGHT.x) !== this.body[0].x) {
 						this.direction = DIRECTION.RIGHT;
-					} else if (keyboardEventCode ==='KeyS' && (this.head.y + DIRECTION.DOWN.y) !== this.body.at(0).y) {
+					} else if (keyboardEventCode ==='KeyS' && (this.head.y + DIRECTION.DOWN.y) !== this.body[0].y) {
 						this.direction = DIRECTION.DOWN;
-					} else if (keyboardEventCode ==='KeyA' && (this.head.x + DIRECTION.LEFT.x) !== this.body.at(0).x) {
+					} else if (keyboardEventCode ==='KeyA' && (this.head.x + DIRECTION.LEFT.x) !== this.body[0].x) {
 						this.direction = DIRECTION.LEFT;
 					}
 				}
@@ -203,9 +202,9 @@
 		<div id="div">
 			<script>
 				const world = new World(0, 24, 0, 24, 100);
-			let snake = new Snake(new Block(4, 2, 'green'), [new Block(3, 2, 'green'), new Block(2, 2, 'green')], DIRECTION.RIGHT);
-			world.spawnBunny(snake);
-			let gameTickId = setInterval(() => {world.updateGame(gameTickId, snake);}, world.tickRate);
+				let snake = new Snake(new Block(4, 2, 'green'), [new Block(3, 2, 'green'), new Block(2, 2, 'green')], DIRECTION.RIGHT);
+				world.spawnBunny(snake);
+				let gameTickId = setInterval(() => {world.updateGame(gameTickId, snake);}, world.tickRate);
 			</script>
 			<p>You can control the snake with the 'wasd' keys!</p>
 		</div>

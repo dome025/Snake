@@ -7,6 +7,7 @@
 			table {
 				border-collapse: collapse;
 				display: inline-table;
+				margin-top: 100px;
 			}
 			table, p {
 				margin-right: 10px;
@@ -65,26 +66,26 @@
 					this.div.appendChild(table);
 				}
 
-				collidesWithWorldEnd(snake) {
-					const snakeHead = snake.head;
-					const direction = snake.direction;
+				collidesWithWorldEnd(vertex, direction = {x: 0, y: 0}) {
 					return (
-							snakeHead.x + direction.x < this.xStart ||
-							snakeHead.x + direction.x > this.xEnd ||
-							snakeHead.y + direction.y < this.yStart ||
-							snakeHead.y + direction.y > this.yEnd
+							vertex.x + direction.x < this.xStart ||
+							vertex.x + direction.x > this.xEnd ||
+							vertex.y + direction.y < this.yStart ||
+							vertex.y + direction.y > this.yEnd
 					);
 				}
 
-				updateGame(gameTickId, snake) {
-					if (this.collidesWithWorldEnd(snake) || snake.doesHeadCollideWithBody()) {
+				updateGame(gameTickId, snake, ai) {
+					let dir = ai.directionList.shift();
+					snake.setDirection(dir);
+					if (this.collidesWithWorldEnd(snake.head, snake.direction) || snake.doesVertexCollideWithBody(snake.head, snake.direction)) {
 						clearInterval(gameTickId);
 						return;
 					}
-					snake.move();
+					snake.move(ai);
 				}
 
-				spawnBunny(snake) {
+				spawnBunny(snake, ai) {
 					let x;
 					let y;
 					do {
@@ -98,6 +99,12 @@
 						snake.body.find(bodyPart => bodyPart.x === x && bodyPart.y === y)
 					)
 					this.bunny = new Block(x, y, 'grey');
+					ai.createPathToTarget(snake);
+					ai.convertPathIntoDirections(snake);
+					console.log(this.bunny);
+					console.log(ai.path);
+					console.log(ai.directionList);
+					this.bunny.paintBlock();
 				}
 			}
 			class Snake {
@@ -114,7 +121,7 @@
 					world.div.appendChild(this.scoreSpan);
 				}
 
-				move() {
+				move(ai) {
 					this.head.decolorizeBlock();
 					this.head.move(this.direction.x, this.direction.y)
 					this.head.setActiveDomElement();
@@ -125,7 +132,7 @@
 					} else {
 						this.bunnyScore++;
 						this.scoreSpan.textContent = 'Bunnies eaten: ' + this.bunnyScore;
-						world.spawnBunny(this);
+						world.spawnBunny(this, ai);
 					}
 				}
 
@@ -141,21 +148,38 @@
 					}
 				}
 
-				doesHeadCollideWithBody() {
+				doesVertexCollideWithBody(vertex, direction = {x: 0, y: 0}) {
 					let doesCollide = false;
 					this.body.forEach((bodyPart) => {
-						if (this.head.x + this.direction.x === bodyPart.x && this.head.y + this.direction.y === bodyPart.y) {
+						if (vertex.x + direction.x === bodyPart.x && vertex.y + direction.y === bodyPart.y) {
 							doesCollide = true;
 						}
 					});
 					return doesCollide;
 				}
+
+				setDirection(direction) {
+					if (direction !== undefined && direction !== null) {
+						if (this.head.x + direction.x !== this.body[0].x && this.head.y + direction.y !== this.body[0].y) {
+							this.direction = direction;
+						}
+					}
+				}
 			}
-			class Block {
-				activeDomElement;
-				constructor(x, y, color) {
+			class Vertex {
+				constructor(x, y) {
 					this.x = x;
 					this.y = y;
+					this.parent = null;
+					this.f = 0;
+					this.h = 0;
+					this.g = 0;
+				}
+			}
+			class Block extends Vertex {
+				activeDomElement;
+				constructor(x, y, color) {
+					super(x, y);
 					this.color = color;
 					this.setActiveDomElement();
 					this.paintBlock();
@@ -198,15 +222,103 @@
 				}
 			};
 			Object.freeze(DIRECTION);
+			class SnakeController {
+				path;
+				directionList;
+				constructor() {
+					this.directionList = [];
+					this.path = [];
+					this.vp = [];
+				}
+
+				createPathToTarget(snake) {
+					this.path = [];
+					let openList = [];
+					let closedList = [];
+					let startPoint = new Vertex(snake.head.x, snake.head.y);
+					let endPoint = new Vertex(world.bunny.x, world.bunny.y);
+					openList.push(startPoint);
+					while (openList.length > 0) {
+						let currentIndex = 0;
+						let currentVertex = openList[currentIndex];
+						for (let i = 0; i < openList.length; i++) {
+							if (openList[i].f < currentVertex.f) {
+								currentVertex = openList[i];
+								currentIndex = i;
+							}
+						}
+						openList.splice(currentIndex, 1);
+						closedList.push(currentVertex);
+						if (currentVertex.x === endPoint.x && currentVertex.y === endPoint.y) {
+							let current = currentVertex;
+							while (current !== null && current !== undefined) {
+								this.path.unshift(current);
+								current = current.parent;
+							}
+							return true;
+						}
+						let children = [];
+						for (let directionKey in DIRECTION) {
+							let possibleChildVertex = new Vertex(currentVertex.x + DIRECTION[directionKey].x, currentVertex.y + DIRECTION[directionKey].y);
+							let a = !world.collidesWithWorldEnd(possibleChildVertex);
+							let b = !snake.doesVertexCollideWithBody(possibleChildVertex);
+							let c = closedList.find(vertex => vertex.x === possibleChildVertex.x && vertex.y === possibleChildVertex.y) === undefined;
+							if (a && b && c) {
+								new Block(possibleChildVertex.x, possibleChildVertex.y, 'blue');
+								let childInOpenListVertex = openList.find(vertex => vertex.x === possibleChildVertex.x && vertex.y === possibleChildVertex.y);
+								if (childInOpenListVertex === null || childInOpenListVertex === undefined) {
+									openList.push(possibleChildVertex);
+									possibleChildVertex.parent = currentVertex;
+									possibleChildVertex.g = possibleChildVertex.parent.g + 1;
+									possibleChildVertex.h = (possibleChildVertex.x - endPoint.x) ** 2 + (possibleChildVertex.y - endPoint.y) ** 2;
+									possibleChildVertex.f = possibleChildVertex.g + possibleChildVertex.h;
+								} else {
+									if (possibleChildVertex.g < childInOpenListVertex.g) {
+										childInOpenListVertex.parent = currentVertex;
+									}
+								}
+							}
+						}
+					}
+					return false;
+				}
+
+				convertPathIntoDirections(snake) {
+					for (let i = this.path.length - 1; i > 0; i--) {
+						let vertex = this.path[i];
+						let parent;
+						if (vertex.parent === null || vertex.parent === undefined) {
+							parent = snake.head;
+						} else {
+							parent = vertex.parent;
+						}
+						new Block(vertex.x, vertex.y, 'red');
+						let direction = {
+								x: vertex.x - parent.x,
+								y: vertex.y - parent.y
+						}
+						this.directionList.unshift(direction);
+					};
+				}
+
+				getRandomDirection() {
+					let directionKeys = Object.keys(DIRECTION);
+					return DIRECTION[directionKeys[Math.floor(directionKeys.length * Math.random())]];
+				}
+			}
 		</script>
 		<div id="div">
 			<script>
 				const world = new World(0, 24, 0, 24, 100);
 				let snake = new Snake(new Block(4, 2, 'green'), [new Block(3, 2, 'green'), new Block(2, 2, 'green')], DIRECTION.RIGHT);
-				world.spawnBunny(snake);
-				let gameTickId = setInterval(() => {world.updateGame(gameTickId, snake);}, world.tickRate);
+				const ai = new SnakeController();
+				world.spawnBunny(snake, ai);
+				let gameTickId = setInterval(() => {world.updateGame(gameTickId, snake, ai);}, world.tickRate);
 			</script>
 			<p>You can control the snake with the 'wasd' keys!</p>
 		</div>
+		<script>
+		
+		</script>
 	</body>
 </html>

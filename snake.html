@@ -76,13 +76,15 @@
 				}
 
 				updateGame(gameTickId, snake, ai) {
-					let dir = ai.directionList.shift();
-					snake.setDirection(dir);
+					if (withAi) {
+						let dir = ai.directionList.shift();
+						snake.setDirection(dir);
+					}
 					if (this.collidesWithWorldEnd(snake.head, snake.direction) || snake.doesVertexCollideWithBody(snake.head, snake.direction)) {
 						clearInterval(gameTickId);
 						return;
 					}
-					snake.move(ai);
+					snake.move(ai, this);
 				}
 
 				spawnBunny(snake, ai) {
@@ -99,16 +101,15 @@
 						snake.body.find(bodyPart => bodyPart.x === x && bodyPart.y === y)
 					)
 					this.bunny = new Block(x, y, 'grey');
-					ai.createPathToTarget(snake);
-					ai.convertPathIntoDirections(snake);
-					console.log(this.bunny);
-					console.log(ai.path);
-					console.log(ai.directionList);
+					if (withAi) {
+						ai.createPathToTarget(snake, this);
+						ai.convertPathIntoDirections(snake);
+					}
 					this.bunny.paintBlock();
 				}
 			}
 			class Snake {
-				constructor(head, body, direction) {
+				constructor(head, body, direction, world) {
 					this.head = head;
 					this.body = body;
 					this.direction = direction;
@@ -121,7 +122,7 @@
 					world.div.appendChild(this.scoreSpan);
 				}
 
-				move(ai) {
+				move(ai, world) {
 					this.head.decolorizeBlock();
 					this.head.move(this.direction.x, this.direction.y)
 					this.head.setActiveDomElement();
@@ -231,7 +232,7 @@
 					this.vp = [];
 				}
 
-				createPathToTarget(snake) {
+				createPathToTarget(snake, world) {
 					this.path = [];
 					let openList = [];
 					let closedList = [];
@@ -257,14 +258,12 @@
 							}
 							return true;
 						}
-						let children = [];
 						for (let directionKey in DIRECTION) {
 							let possibleChildVertex = new Vertex(currentVertex.x + DIRECTION[directionKey].x, currentVertex.y + DIRECTION[directionKey].y);
-							let a = !world.collidesWithWorldEnd(possibleChildVertex);
-							let b = !snake.doesVertexCollideWithBody(possibleChildVertex);
-							let c = closedList.find(vertex => vertex.x === possibleChildVertex.x && vertex.y === possibleChildVertex.y) === undefined;
-							if (a && b && c) {
-								new Block(possibleChildVertex.x, possibleChildVertex.y, 'blue');
+							let doesNotCollideWithWorldEnd = !world.collidesWithWorldEnd(possibleChildVertex);
+							let doesNotColideWithSnakeBody = !snake.doesVertexCollideWithBody(possibleChildVertex);
+							let isNotInClosedList = closedList.find(vertex => vertex.x === possibleChildVertex.x && vertex.y === possibleChildVertex.y) === undefined;
+							if (doesNotCollideWithWorldEnd && doesNotColideWithSnakeBody && isNotInClosedList) {
 								let childInOpenListVertex = openList.find(vertex => vertex.x === possibleChildVertex.x && vertex.y === possibleChildVertex.y);
 								if (childInOpenListVertex === null || childInOpenListVertex === undefined) {
 									openList.push(possibleChildVertex);
@@ -292,7 +291,6 @@
 						} else {
 							parent = vertex.parent;
 						}
-						new Block(vertex.x, vertex.y, 'red');
 						let direction = {
 								x: vertex.x - parent.x,
 								y: vertex.y - parent.y
@@ -306,19 +304,45 @@
 					return DIRECTION[directionKeys[Math.floor(directionKeys.length * Math.random())]];
 				}
 			}
-		</script>
-		<div id="div">
-			<script>
+
+			function initializeDiv() {
+				let div = document.createElement('div');
+				div.id = 'div';
+				let script = document.createElement('script');
+				script.innerHTML = 'initializeGame()';
+				let p = document.createElement('p');
+				p.innerText = 'You can control the snake with the \'wasd\' keys!';
+				let fButton = document.createElement('button');
+				fButton.innerText = 'Play again!';
+				fButton.onclick = () => {withAi = false; reloadGame();};
+				let sButton = document.createElement('button');
+				sButton.innerText = 'Let the ai play!';
+				sButton.onclick = () => {withAi = true; reloadGame();};
+				div.appendChild(script);
+				let body = document.getElementById('body');
+				body.append(div);
+				div.appendChild(fButton);
+				div.appendChild(sButton);
+				div.appendChild(p);
+			}
+
+			function initializeGame() {
 				const world = new World(0, 24, 0, 24, 100);
-				let snake = new Snake(new Block(4, 2, 'green'), [new Block(3, 2, 'green'), new Block(2, 2, 'green')], DIRECTION.RIGHT);
+				let snake = new Snake(new Block(4, 2, 'green'), [new Block(3, 2, 'green'), new Block(2, 2, 'green')], DIRECTION.RIGHT, world);
 				const ai = new SnakeController();
 				world.spawnBunny(snake, ai);
-				let gameTickId = setInterval(() => {world.updateGame(gameTickId, snake, ai);}, world.tickRate);
-			</script>
-			<p>You can control the snake with the 'wasd' keys!</p>
-		</div>
-		<script>
-		
+				gameTickId = setInterval(() => {world.updateGame(gameTickId, snake, ai);}, world.tickRate);
+			}
+
+			function reloadGame(withAi = false) {
+				clearInterval(gameTickId)
+				let div = document.getElementById('div');
+				div.remove();
+				initializeDiv();
+			}
+			let gameTickId;
+			let withAi = false;
+			initializeDiv();
 		</script>
 	</body>
 </html>
